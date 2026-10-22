@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@upstash/redis": "^1.39.0",
     "dingtalk-jsapi": "^3.2.9",
     "dotenv": "^17.4.2",
     "echarts": "^6.1.0",

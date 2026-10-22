@@ -1,6 +1,13 @@
-import { randomUUID } from "node:crypto";
-import type Redis from "ioredis";
+import type { VoteRedisClient } from "./redis";
 import { redis as redisClient } from "./redis";
+
+function generateUUID(): string {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  return require("node:crypto").randomUUID();
+}
 import { getBus } from "./bus";
 import { appendAudit } from "./audit";
 import {
@@ -75,7 +82,7 @@ export async function createPoll(input: {
   bg_image?: string;
   allowed_auth?: AllowedAuthType;
 }): Promise<PollMeta> {
-  const pollId = randomUUID().replace(/-/g, "").slice(0, 12);
+  const pollId = generateUUID().replace(/-/g, "").slice(0, 12);
   const options: PollOption[] = input.options.map(({ label, image }, i) => ({
     id: `opt_${i + 1}`,
     label,
@@ -225,7 +232,7 @@ export async function getPollMeta(pollId: string): Promise<PollMeta | null> {
 
 export async function getSnapshot(
   redisOrPollId: string,
-  client?: Redis
+  client?: VoteRedisClient
 ): Promise<Snapshot | null> {
   const r = client ?? redisClient;
   const meta = await getPollMeta(redisOrPollId);
@@ -233,7 +240,7 @@ export async function getSnapshot(
   return buildSnapshot(meta, r);
 }
 
-async function buildSnapshot(meta: PollMeta, r: Redis): Promise<Snapshot> {
+async function buildSnapshot(meta: PollMeta, r: VoteRedisClient): Promise<Snapshot> {
   const [countsRaw, voters] = await Promise.all([
     r.hgetall(pollCountsKey(meta.poll_id)),
     r.scard(pollVotersKey(meta.poll_id)),
@@ -277,21 +284,6 @@ const ERROR_CODE_MAP: Record<number, VoteErrorCode> = {
   [-6]: "CHOICES_OUT_OF_RANGE",
 };
 
-type VoteCommand = (
-  metaKey: string,
-  countsKey: string,
-  votersKey: string,
-  choicesKey: string,
-  now: string,
-  count: string,
-  ...optionIds: string[]
-) => Promise<number>;
-
-/** defineCommand 注册的 Lua 投票命令（见 lib/redis.ts） */
-const voteCommand = (redisClient as unknown as { vote: VoteCommand }).vote.bind(
-  redisClient
-);
-
 export async function castVote(
   pollId: string,
   userId: string,
@@ -310,7 +302,7 @@ export async function castVote(
   }
 
   const now = Date.now();
-  const result = await voteCommand(
+  const result = await redisClient.vote(
     pollMetaKey(pollId),
     pollCountsKey(pollId),
     pollVotersKey(pollId),
