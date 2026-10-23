@@ -78,7 +78,13 @@ function createUpstashClient(url: string, token: string): VoteRedisClient {
       if (!res) return {};
       const out: Record<string, string> = {};
       for (const [k, v] of Object.entries(res)) {
-        out[k] = v !== null && v !== undefined ? String(v) : "";
+        if (v === null || v === undefined) {
+          out[k] = "";
+        } else if (typeof v === "object") {
+          out[k] = JSON.stringify(v);
+        } else {
+          out[k] = String(v);
+        }
       }
       return out;
     },
@@ -102,7 +108,9 @@ function createUpstashClient(url: string, token: string): VoteRedisClient {
     async smembers(key: string) {
       const res = await client.smembers(key);
       if (!Array.isArray(res)) return [];
-      return res.map(String);
+      return res.map((item) =>
+        typeof item === "object" && item !== null ? JSON.stringify(item) : String(item)
+      );
     },
     async sismember(key: string, member: string) {
       const res = await client.sismember(key, member);

@@ -51,7 +51,12 @@ function parseMeta(pollId: string, raw: Record<string, string>): PollMeta | null
   if (!raw.title) return null;
   let options: PollOption[] = [];
   try {
-    options = JSON.parse(raw.options ?? "[]");
+    const rawOpt = (raw as Record<string, unknown>).options;
+    if (Array.isArray(rawOpt)) {
+      options = rawOpt as PollOption[];
+    } else if (typeof rawOpt === "string") {
+      options = JSON.parse(rawOpt);
+    }
   } catch {
     options = [];
   }
@@ -490,10 +495,14 @@ export async function getPollVoters(pollId: string): Promise<{
     let ts = meta.created_at;
     let optionIds: string[] = [];
 
-    const rawMeta = votersMetaRaw[uid];
+    const rawMeta = votersMetaRaw[uid] as unknown;
     if (rawMeta) {
       try {
-        const parsed = JSON.parse(rawMeta);
+        const parsed = (typeof rawMeta === "string" ? JSON.parse(rawMeta) : rawMeta) as {
+          nickname?: string;
+          ts?: number;
+          option_ids?: string[];
+        };
         nickname = parsed.nickname || "";
         ts = Number(parsed.ts) || ts;
         if (Array.isArray(parsed.option_ids)) {
