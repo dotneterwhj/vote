@@ -163,7 +163,7 @@ function createUpstashClient(url: string, token: string): VoteRedisClient {
   };
 }
 
-function createIoredisClient(): VoteRedisClient {
+function createIoredisClient(url: string): VoteRedisClient {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const IORedis = require("ioredis");
   const r = new IORedis(url, { maxRetriesPerRequest: 3, lazyConnect: true });
@@ -265,14 +265,16 @@ function createIoredisClient(): VoteRedisClient {
 const g = globalThis as unknown as { __voteRedis?: VoteRedisClient };
 
 function create(): VoteRedisClient {
-  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL || process.env.KV_REST_API_URL;
-  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN || process.env.KV_REST_API_TOKEN;
+  const upstashUrl = process.env.UPSTASH_REDIS_REST_URL;
+  const upstashToken = process.env.UPSTASH_REDIS_REST_TOKEN;
 
   if (upstashUrl && upstashToken) {
     return createUpstashClient(upstashUrl, upstashToken);
   }
-
-  return createIoredisClient();
+  else {
+    const url = process.env.REDIS_URL || "redis://localhost:6379";
+    return createIoredisClient(url);
+  }
 }
 
 export const redis: VoteRedisClient = (g.__voteRedis ??= create());
